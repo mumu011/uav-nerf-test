@@ -636,7 +636,13 @@ public:
 			NerfDataset dataset;
 			int n_images_for_training = 0; // how many images to train from, as a high watermark compared to the dataset size
 			int n_images_for_training_prev = 0; // how many images we saw last time we updated the density grid
-
+			uint32_t max_empty_samples_per_ray = 2; // how many empty cells points we sampled
+			uint32_t max_samples_behind_surface = 10;
+			float lower_limit_opaque_point_weight = 0.01; // supervise the opaque cells point's weight by this value. weight is correltaed by T,dt, and density
+			float minimum_thickness_of_opaque_object_realunit = 0.; // used to extend the opaque cell
+			float minimum_thickness_of_opaque_object = 0.; // used to extend the opaque cell
+			float empty_density_loss_scale = 0.00000001;
+			float opaque_density_loss_scale = 0.001;
 			struct ErrorMap {
 				tcnn::GPUMemory<float> data;
 				tcnn::GPUMemory<float> cdf_x_cond_y;
@@ -732,6 +738,7 @@ public:
 		} training = {};
 
 		tcnn::GPUMemory<float> density_grid; // NERF_GRIDSIZE()^3 grid of EMA smoothed densities from the network
+		tcnn::GPUMemory<int> density_grid_frozen; // value=1 indicates that grid cell dose not update
 		tcnn::GPUMemory<uint8_t> density_grid_bitfield;
 		uint8_t* get_density_grid_bitfield_mip(uint32_t mip);
 		tcnn::GPUMemory<float> density_grid_mean;

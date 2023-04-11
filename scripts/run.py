@@ -29,7 +29,7 @@ def parse_args():
 
 	parser.add_argument("files", nargs="*", help="Files to be loaded. Can be a scene, network config, snapshot, camera path, or a combination of those.")
 
-	parser.add_argument("--scene", "--training_data", default="", help="The scene to load. Can be the scene's name or a full path to the training data. Can be NeRF dataset, a *.obj/*.stl mesh for training a SDF, an image, or a *.nvdb volume.")
+	parser.add_argument("--scene", "--training_data", default="/data/nerf/new_data_v2/transforms.json", help="The scene to load. Can be the scene's name or a full path to the training data. Can be NeRF dataset, a *.obj/*.stl mesh for training a SDF, an image, or a *.nvdb volume.")
 	parser.add_argument("--mode", default="", type=str, help=argparse.SUPPRESS) # deprecated
 	parser.add_argument("--network", default="", help="Path to the network config. Uses the scene's default if unspecified.")
 
@@ -43,7 +43,7 @@ def parse_args():
 
 	parser.add_argument("--screenshot_transforms", default="", help="Path to a nerf style transforms.json from which to save screenshots.")
 	parser.add_argument("--screenshot_frames", nargs="*", help="Which frame(s) to take screenshots of.")
-	parser.add_argument("--screenshot_dir", default="", help="Which directory to output screenshots to.")
+	parser.add_argument("--screenshot_dir", default="E:\Workspace\instant-ngp\output", help="Which directory to output screenshots to.")
 	parser.add_argument("--screenshot_spp", type=int, default=16, help="Number of samples per pixel in screenshots.")
 
 	parser.add_argument("--video_camera_path", default="", help="The camera path to render, e.g., base_cam.json.")
@@ -61,7 +61,7 @@ def parse_args():
 
 	parser.add_argument("--gui", action="store_true", help="Run the testbed GUI interactively.")
 	parser.add_argument("--train", action="store_true", help="If the GUI is enabled, controls whether training starts immediately.")
-	parser.add_argument("--n_steps", type=int, default=-1, help="Number of steps to train for before quitting.")
+	parser.add_argument("--n_steps", type=int, default=1000, help="Number of steps to train for before quitting.")
 	parser.add_argument("--second_window", action="store_true", help="Open a second window containing a copy of the main output.")
 	parser.add_argument("--vr", action="store_true", help="Render to a VR headset.")
 
@@ -290,7 +290,8 @@ if __name__ == "__main__":
 			os.makedirs(os.path.dirname(outname), exist_ok=True)
 			write_image(outname, image)
 	elif args.screenshot_dir:
-		outname = os.path.join(args.screenshot_dir, args.scene + "_" + network_stem)
+		# outname = os.path.join(args.screenshot_dir, args.scene + "_" + network_stem + "_original")
+		outname = args.screenshot_dir + args.scene + "_" + network_stem
 		print(f"Rendering {outname}.png")
 		image = testbed.render(args.width or 1920, args.height or 1080, args.screenshot_spp, True)
 		if os.path.dirname(outname) != "":

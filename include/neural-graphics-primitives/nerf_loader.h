@@ -56,6 +56,7 @@ inline size_t image_type_size(EImageDataType type) {
 
 inline size_t depth_type_size(EDepthDataType type) {
 	switch (type) {
+		case EDepthDataType::Byte: return 1;
 		case EDepthDataType::UShort: return 2;
 		case EDepthDataType::Float: return 4;
 		default: return 0;
@@ -94,6 +95,10 @@ struct NerfDataset {
 	bool is_hdr = false;
 	bool wants_importance_sampling = true;
 	bool has_rays = false;
+	bool m_depth_optimize_density_grid = false;
+	float depth_range;
+	float real2ngp_uint_conersion;
+	EDepthDataType depth_data_type;
 
 	uint32_t n_extra_learnable_dims = 0;
 	bool has_light_dirs = false;

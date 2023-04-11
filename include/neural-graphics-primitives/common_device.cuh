@@ -834,6 +834,7 @@ enum class EImageDataType {
 };
 
 enum class EDepthDataType {
+	Byte,
 	UShort,
 	Float,
 };

@@ -434,6 +434,20 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 		if (json.contains("enable_depth_loading")) {
 			enable_depth_loading = bool(json["enable_depth_loading"]);
 			tlog::info() << "enable_depth_loading is " << enable_depth_loading;
+			if (enable_depth_loading) {
+				result.m_depth_optimize_density_grid = true;
+			}
+			uint32_t depth_bit_depth = json["depth_bit_depth"];
+			float depth_range_realunit = json["depth_range_realunit"];
+			result.real2ngp_uint_conersion = json["real2ngp_uint_conersion"];
+			float depth_range = depth_range_realunit * result.real2ngp_uint_conersion;
+			info.depth_scale = depth_range/((float)pow(2,depth_bit_depth)-1);
+			result.depth_range = depth_range * result.scale;
+			switch (depth_bit_depth) {
+				default: throw std::runtime_error{"not supported depth_bit_depth"};
+				case 8: result.depth_data_type=EDepthDataType::Byte; break;
+				case 16: result.depth_data_type=EDepthDataType::UShort; break;
+			}
 		}
 
 		if (json.contains("normal_mts_args")) {
@@ -625,7 +639,11 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 				fs::path depthpath = resolve_path(base_path, frame["depth_path"]);
 				if (depthpath.exists()) {
 					int wa = 0, ha = 0;
-					dst.depth_pixels = load_stbi_16(depthpath, &wa, &ha, &comp, 1);
+					switch (result.depth_data_type) {
+						default: throw std::runtime_error{"not supported depth_data_type"};
+						case EDepthDataType::Byte: dst.depth_pixels = (uint16_t*)stbi_load(depthpath.str().c_str(), &wa, &ha, &comp, 1); break;
+						case EDepthDataType::UShort: dst.depth_pixels = stbi_load_16(depthpath.str().c_str(), &wa, &ha, &comp, 1); break;
+					}
 					if (!dst.depth_pixels) {
 						throw std::runtime_error{fmt::format("Could not load depth image '{}'.", depthpath.str())};
 					}
@@ -724,7 +742,7 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 	// copy / convert images to the GPU
 	for (uint32_t i = 0; i < result.n_images; ++i) {
 		const LoadedImageInfo& m = images[i];
-		result.set_training_image(i, m.res, m.pixels, m.depth_pixels, m.depth_scale * result.scale, m.image_data_on_gpu, m.image_type, EDepthDataType::UShort, sharpen_amount, m.white_transparent, m.black_transparent, m.mask_color, m.rays);
+		result.set_training_image(i, m.res, m.pixels, m.depth_pixels, m.depth_scale * result.scale, m.image_data_on_gpu, m.image_type, result.depth_data_type, sharpen_amount, m.white_transparent, m.black_transparent, m.mask_color, m.rays);
 		CUDA_CHECK_THROW(cudaDeviceSynchronize());
 	}
 	CUDA_CHECK_THROW(cudaDeviceSynchronize());
@@ -790,6 +808,7 @@ void NerfDataset::set_training_image(int frame_idx, const ivec2& image_resolutio
 
 		switch (depth_type) {
 			default: throw std::runtime_error{"unknown depth type in set_training_image"};
+			case EDepthDataType::Byte: linear_kernel(copy_depth<uint8_t>, 0, nullptr, n_pixels, depth_dst, (const uint8_t*)depth_pixels, depth_scale); break;
 			case EDepthDataType::UShort: linear_kernel(copy_depth<uint16_t>, 0, nullptr, n_pixels, depth_dst, (const uint16_t*)depth_pixels, depth_scale); break;
 			case EDepthDataType::Float: linear_kernel(copy_depth<float>, 0, nullptr, n_pixels, depth_dst, (const float*)depth_pixels, depth_scale); break;
 		}
