@@ -407,7 +407,8 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 	size_t image_idx = 0;
 
 	if (result.n_images == 0) {
-		throw std::invalid_argument{"No training images were found for NeRF training!"};
+		// throw std::invalid_argument{"No training images were found for NeRF training!"};
+		return result;
 	}
 
 	auto progress = tlog::progress(result.n_images);
@@ -434,9 +435,9 @@ NerfDataset load_nerf(const std::vector<fs::path>& jsonpaths, float sharpen_amou
 		if (json.contains("enable_depth_loading")) {
 			enable_depth_loading = bool(json["enable_depth_loading"]);
 			tlog::info() << "enable_depth_loading is " << enable_depth_loading;
-			if (enable_depth_loading) {
-				result.m_depth_optimize_density_grid = true;
-			}
+			// if (enable_depth_loading) {
+			// 	result.m_depth_optimize_density_grid = true;
+			// }
 			uint32_t depth_bit_depth = json["depth_bit_depth"];
 			float depth_range_realunit = json["depth_range_realunit"];
 			result.real2ngp_uint_conersion = json["real2ngp_uint_conersion"];

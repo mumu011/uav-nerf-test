@@ -1357,13 +1357,17 @@ __global__ void generate_training_samples_nerf(
 	if (i >= n_rays) return;
 
 	uint32_t img = image_idx(i, n_rays, n_rays_total, n_training_images, cdf_img);
+	// printf("img:%d", img);
 	ivec2 resolution = metadata[img].resolution;
 
 	rng.advance(i * N_MAX_RANDOM_SAMPLES_PER_RAY());
 	vec2 uv = nerf_random_image_pos_training(rng, resolution, snap_to_pixel_centers, cdf_x_cond_y, cdf_y, cdf_res, img);
+	// const float depth = read_depth(uv, resolution, metadata[img].depth);
+	// printf("depth:%.2f\n", depth);
 
 	// Negative values indicate masked-away regions
 	size_t pix_idx = pixel_idx(uv, resolution, 0);
+	// printf("rgba:%.2f", read_rgba(uv, resolution, metadata[img].pixels, metadata[img].image_data_type).x);
 	if (read_rgba(uv, resolution, metadata[img].pixels, metadata[img].image_data_type).x < 0.0f) {
 		return;
 	}
@@ -1414,7 +1418,9 @@ __global__ void generate_training_samples_nerf(
 	vec3 ray_d_normalized = normalize(ray_unnormalized.d);
 
 	vec2 tminmax = aabb.ray_intersect(ray_unnormalized.o, ray_d_normalized);
+	// printf("tminmax.x:%.2f, tminmax.y:%.2f\n", tminmax.x, tminmax.y);
 	float cone_angle = calc_cone_angle(dot(ray_d_normalized, xform[2]), focal_length, cone_angle_constant);
+	// printf("cone_angle:%.2f\n", cone_angle);
 
 	// The near distance prevents learning of camera-specific fudge right in front of the camera
 	tminmax.x = fmaxf(tminmax.x, 0.0f);
@@ -1427,6 +1433,12 @@ __global__ void generate_training_samples_nerf(
 	float t = startt;
 	vec3 pos;
 
+	pos = ray_unnormalized.o + t * ray_d_normalized;
+	// printf("ray_unnormalized.o.x:%.2f,ray_unnormalized.o.y:%.2f,ray_unnormalized.o.z:%.2f\n", ray_unnormalized.o.x, ray_unnormalized.o.y, ray_unnormalized.o.z);
+	// printf("t:%.2f", t);
+	// printf("ray_d_normalized.x:%.2f,ray_d_normalized.y:%.2f,ray_d_normalized.z:%.2f\n", ray_d_normalized.x, ray_d_normalized.y, ray_d_normalized.z);
+	// printf("pos_x:%.2f, pos_y:%.2f, pos_z:%.2f\n", pos.x, pos.y, pos.z);
+	// printf("min_x:%.2f, min_y:%.2f, min_z:%.2f, max_x:%.2f, max_y:%.2f, max_z:%.2f\n", aabb.min.x, aabb.min.y, aabb.min.z, aabb.max.x, aabb.max.y, aabb.max.z);
 	while (aabb.contains(pos = ray_unnormalized.o + t * ray_d_normalized) && j < NERF_STEPS()) {
 		float dt = calc_dt(t, cone_angle);
 		uint32_t mip = mip_from_dt(dt, pos, max_mip);
@@ -1437,6 +1449,7 @@ __global__ void generate_training_samples_nerf(
 			t = advance_to_next_voxel(t, cone_angle, pos, ray_d_normalized, idir, mip);
 		}
 	}
+	// printf("j:%d", j);
 	if (j == 0 && !train_envmap) {
 		return;
 	}
@@ -2320,9 +2333,9 @@ __global__ void compute_loss_kernel_train_nerf_optimized_by_depth(
 			tcnn::vector_t<tcnn::network_precision_t, 4> local_dL_doutput;
 			if (weight >= lower_limit_opaque_point_weight) {
 				local_dL_doutput[3] = 0.0f;
-				local_dL_doutput[0] = 0.0f;
-				local_dL_doutput[1] = 0.0f;
-				local_dL_doutput[2] = 0.0f;
+				local_dL_doutput[0] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
+				local_dL_doutput[1] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
+				local_dL_doutput[2] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
 			}
 			else {
 				//	 dloss_doutput = dloss_dweight * dweight_ddensity * density_derivative
@@ -2330,9 +2343,9 @@ __global__ void compute_loss_kernel_train_nerf_optimized_by_depth(
 				float dweight_ddensity = dt*T* __expf(-density * dt);
 				float density_derivative = network_to_density_derivative(float(local_network_output[3]), density_activation);
 				local_dL_doutput[3] = opaque_density_loss_scale * loss_scale * lg_dloss_dweight.gradient * dweight_ddensity * density_derivative;
-				local_dL_doutput[0] = 0.0f;
-				local_dL_doutput[1] = 0.0f;
-				local_dL_doutput[2] = 0.0f;
+				local_dL_doutput[0] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
+				local_dL_doutput[1] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
+				local_dL_doutput[2] = fmaxf(0.0f, output_l2_reg * (float)local_network_output[0]);
 			}
 			*(tcnn::vector_t<tcnn::network_precision_t, 4>*)dloss_doutput = local_dL_doutput;
 
@@ -3827,7 +3840,7 @@ void Testbed::update_density_grid_nerf(float decay, uint32_t n_uniform_density_g
 			CUDA_CHECK_THROW(cudaMemsetAsync(m_nerf.density_grid.data(), 0, sizeof(float)*n_elements, stream));
 		}
 		// m_nerf.training.dataset.m_depth_optimize_density_grid = false;
-		if (m_nerf.training.dataset.m_depth_optimize_density_grid) {
+		if (m_nerf.training.depth_optimize_density_grid) {
 			// use depth to set the density grid, where the point before the surface is set to 0 and the point around surface is set to 1.
 			// const uint32_t n_pixels_total = training.n_images_for_training * training.dataset.metadata[0].resolution.prod();
 			// const uint32_t n_pixels_total = training.dataset.metadata[0].resolution.prod();
@@ -4050,16 +4063,17 @@ void Testbed::train_nerf(uint32_t target_batch_size, bool get_loss_scalar, cudaS
 	}
 
 	float loss_scalar = m_nerf.training.counters_rgb.update_after_training(target_batch_size, get_loss_scalar, stream);
+	// printf("measured_batch_size:%d", m_nerf.training.counters_rgb.measured_batch_size);
 	bool zero_records = m_nerf.training.counters_rgb.measured_batch_size == 0;
 	if (get_loss_scalar) {
 		m_loss_scalar.update(loss_scalar);
 	}
 
-	if (zero_records) {
-		m_loss_scalar.set(0.f);
-		tlog::warning() << "Nerf training generated 0 samples. Aborting training.";
-		m_train = false;
-	}
+	// if (zero_records) {
+	// 	m_loss_scalar.set(0.f);
+	// 	tlog::warning() << "Nerf training generated 0 samples. Aborting training.";
+	// 	m_train = false;
+	// }
 
 	// Compute CDFs from the error map
 	m_nerf.training.n_steps_since_error_map_update += 1;
@@ -4312,8 +4326,7 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 
 	auto hg_enc = dynamic_cast<GridEncoding<network_precision_t>*>(m_encoding.get());
 
-		bool m_depth_optimize_ray_tracing = true;
-		if (m_depth_optimize_ray_tracing) {
+		if (m_nerf.training.depth_optimize_ray_tracing) {
 			linear_kernel(generate_training_samples_nerf_optimized_by_depth, 0, stream,
 				counters.rays_per_batch,
 				m_aabb,
@@ -4394,7 +4407,7 @@ void Testbed::train_nerf_step(uint32_t target_batch_size, Testbed::NerfCounters&
 		}
 
 		// printf("generate done\n");
-		if (m_depth_optimize_ray_tracing) {
+		if (m_nerf.training.depth_optimize_ray_tracing) {
 			linear_kernel(compute_loss_kernel_train_nerf_optimized_by_depth, 0, stream,
 				counters.rays_per_batch,
 				m_aabb,

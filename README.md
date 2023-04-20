@@ -198,6 +198,9 @@ Then, use CMake to build the project: (on Windows, this must be in a [developer 
 ```sh
 instant-ngp$ cmake . -B build
 instant-ngp$ cmake --build build --config RelWithDebInfo -j
+cd ~/uav-nerf-test/ && python scripts/main.py
+cd ~/uav-nerf-test/ && python scripts/ros_main.py
+cd ~/uav-nerf-sim/launch && roslaunch start_simulation.launch 
 ```
 
 If compilation fails inexplicably or takes longer than an hour, you might be running out of memory. Try running the above command without `-j` in that case.

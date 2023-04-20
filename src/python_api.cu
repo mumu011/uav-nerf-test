@@ -437,6 +437,7 @@ PYBIND11_MODULE(pyngp, m) {
 			py::arg("json"),
 			py::arg("config_base_path") = ""
 		)
+		.def("reload_training_data", &Testbed::reload_training_data, "reload_training_data")
 		.def("override_sdf_training_data", &Testbed::override_sdf_training_data, "Override the training data for learning a signed distance function")
 		.def("calculate_iou", &Testbed::calculate_iou, "Calculate the intersection over union error value",
 			py::arg("n_samples") = 128*1024*1024,
@@ -531,7 +532,7 @@ PYBIND11_MODULE(pyngp, m) {
 		.def_readwrite("visualized_dimension", &Testbed::m_visualized_dimension)
 		.def_readwrite("visualized_layer", &Testbed::m_visualized_layer)
 		.def_property_readonly("loss", [](py::object& obj) { return obj.cast<Testbed&>().m_loss_scalar.val(); })
-		.def_readonly("training_step", &Testbed::m_training_step)
+		.def_readwrite("training_step", &Testbed::m_training_step)
 		.def_readonly("nerf", &Testbed::m_nerf)
 		.def_readonly("sdf", &Testbed::m_sdf)
 		.def_readonly("image", &Testbed::m_image)
@@ -641,6 +642,14 @@ PYBIND11_MODULE(pyngp, m) {
 		;
 
 	py::class_<Testbed::Nerf::Training>(nerf, "Training")
+		.def_readwrite("max_empty_samples_per_ray", &Testbed::Nerf::Training::max_empty_samples_per_ray)
+		.def_readwrite("max_samples_behind_surface", &Testbed::Nerf::Training::max_samples_behind_surface)
+		.def_readwrite("lower_limit_opaque_point_weight", &Testbed::Nerf::Training::lower_limit_opaque_point_weight)
+		.def_readwrite("minimum_thickness_of_opaque_object_realunit", &Testbed::Nerf::Training::minimum_thickness_of_opaque_object_realunit)
+		.def_readwrite("empty_density_loss_scale", &Testbed::Nerf::Training::empty_density_loss_scale)
+		.def_readwrite("opaque_density_loss_scale", &Testbed::Nerf::Training::opaque_density_loss_scale)
+		.def_readwrite("depth_optimize_density_grid", &Testbed::Nerf::Training::depth_optimize_density_grid)
+		.def_readwrite("depth_optimize_ray_tracing", &Testbed::Nerf::Training::depth_optimize_ray_tracing)
 		.def_readwrite("random_bg_color", &Testbed::Nerf::Training::random_bg_color)
 		.def_readwrite("n_images_for_training", &Testbed::Nerf::Training::n_images_for_training)
 		.def_readwrite("linear_colors", &Testbed::Nerf::Training::linear_colors)
