@@ -636,13 +636,15 @@ public:
 			NerfDataset dataset;
 			int n_images_for_training = 0; // how many images to train from, as a high watermark compared to the dataset size
 			int n_images_for_training_prev = 0; // how many images we saw last time we updated the density grid
-			uint32_t max_empty_samples_per_ray = 2; // how many empty cells points we sampled
+			uint32_t max_empty_samples_per_ray = 1; // how many empty cells points we sampled
 			uint32_t max_samples_behind_surface = 10;
 			float lower_limit_opaque_point_weight = 0.01; // supervise the opaque cells point's weight by this value. weight is correltaed by T,dt, and density
 			float minimum_thickness_of_opaque_object_realunit = 0.; // used to extend the opaque cell
 			float minimum_thickness_of_opaque_object = 0.; // used to extend the opaque cell
-			float empty_density_loss_scale = 0.00000001;
+			float empty_density_loss_scale = 0.;
 			float opaque_density_loss_scale = 0.001;
+			bool depth_optimize_density_grid = false;
+			bool depth_optimize_ray_tracing = false;
 			struct ErrorMap {
 				tcnn::GPUMemory<float> data;
 				tcnn::GPUMemory<float> cdf_x_cond_y;

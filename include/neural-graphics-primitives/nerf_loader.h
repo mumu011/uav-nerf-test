@@ -95,7 +95,6 @@ struct NerfDataset {
 	bool is_hdr = false;
 	bool wants_importance_sampling = true;
 	bool has_rays = false;
-	bool m_depth_optimize_density_grid = false;
 	float depth_range;
 	float real2ngp_uint_conersion;
 	EDepthDataType depth_data_type;
