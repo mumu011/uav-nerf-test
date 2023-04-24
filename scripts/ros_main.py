@@ -29,6 +29,7 @@ from omegaconf import OmegaConf
 
 pyngp_path = opj(opd(__file__), "build")
 sys.path.append(pyngp_path)
+# print(pyngp_path)
 import pyngp as ngp
 # from vis import plot_density_grid
 
@@ -174,6 +175,21 @@ def screenshot():
     #         )
     #     )
 
+def render(step):
+    screenshot_dir = opj(output_dir, "screenshot")
+    if not os.path.exists(screenshot_dir):
+        os.makedirs(screenshot_dir)
+    outname = os.path.join(screenshot_dir, f"render_{step}")
+    print(f"Rendering {outname}.png")
+    image = testbed.render(
+            1920,
+            1080,
+            opt.screenshot_spp,
+            True,
+        )
+    if os.path.dirname(outname) != "":
+        os.makedirs(os.path.dirname(outname), exist_ok=True)
+    write_image(outname + ".png", image)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ngp exp")
@@ -221,7 +237,7 @@ if __name__ == "__main__":
 
     sys.exit(0)
     testbed.load_training_data(opt.training_data)
-    sys.exit(0)
+    # sys.exit(0)
     if opt.load_snapshot:
         snapshot = opt.load_snapshot
         print("Loading snapshot ", snapshot)
@@ -245,41 +261,52 @@ if __name__ == "__main__":
     train_seconds_last = 0
     # TODO:
     # testbed.change_rays_per_batch(opt.rays_per_batch)
-    if n_steps > 0:
-        with tqdm(desc="Training", total=n_steps, unit="step") as t:
-            while True:
-                if (
-                    testbed.training_step >= n_steps
-                    or train_seconds_last >= train_seconds
-                ):
-                    with open(log_path, "a") as f:
-                        f.write(
-                            "train steps:{}\ntrain seconds:{}\n".format(
-                                testbed.training_step, train_seconds_last
-                            )
-                        )
-                        f.write(
-                            "seconds per train step:{}\n".format(
-                                train_seconds_last / testbed.training_step
-                            )
-                        )
-                    break
-                tic = time.time()
-                testbed.frame()
-                # print(f"training_step:{testbed.training_step}")
-                # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
-                toc = time.time()
-                train_seconds_last += toc - tic
-                # Update progress bar
-                if testbed.training_step < old_training_step or old_training_step == 0:
-                    old_training_step = 0
-                    t.reset()
-                now = time.monotonic()
-                if now - tqdm_last_update > 0.1:
-                    t.update(testbed.training_step - old_training_step)
-                    t.set_postfix(loss=testbed.loss)
-                    old_training_step = testbed.training_step
-                    tqdm_last_update = now
+    # if n_steps > 0:
+    #     with tqdm(desc="Training", total=n_steps, unit="step") as t:
+    #         while True:
+    #             if (
+    #                 testbed.training_step >= n_steps
+    #                 or train_seconds_last >= train_seconds
+    #             ):
+    #                 with open(log_path, "a") as f:
+    #                     f.write(
+    #                         "train steps:{}\ntrain seconds:{}\n".format(
+    #                             testbed.training_step, train_seconds_last
+    #                         )
+    #                     )
+    #                     f.write(
+    #                         "seconds per train step:{}\n".format(
+    #                             train_seconds_last / testbed.training_step
+    #                         )
+    #                     )
+    #                 break
+    #             tic = time.time()
+    #             testbed.frame()
+    #             # print(f"training_step:{testbed.training_step}")
+    #             # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
+    #             toc = time.time()
+    #             train_seconds_last += toc - tic
+    #             # Update progress bar
+    #             if testbed.training_step < old_training_step or old_training_step == 0:
+    #                 old_training_step = 0
+    #                 t.reset()
+    #             now = time.monotonic()
+    #             if now - tqdm_last_update > 0.1:
+    #                 t.update(testbed.training_step - old_training_step)
+    #                 t.set_postfix(loss=testbed.loss)
+    #                 old_training_step = testbed.training_step
+    #                 tqdm_last_update = now
+
+    while True:
+        try:
+            testbed.frame()
+        except Exception as e:
+            testbed.reset()
+        print(f"training_step:{testbed.training_step}, loss:{testbed.loss}")
+        if (np.isnan(testbed.loss) or testbed.loss == 0.0):
+            testbed.reset()
+        if (testbed.training_step > 0 and testbed.training_step % 500 == 0):
+            render(testbed.training_step)
 
     if opt.save_snapshot:
         print("Saving snapshot ", opt.save_snapshot)
@@ -295,22 +322,22 @@ if __name__ == "__main__":
         )
         testbed.compute_and_save_marching_cubes_mesh(opt.save_mesh, [res, res, res])
 
-    if opt.screenshot:
-        screenshot_dir = opj(output_dir, "screenshot")
-        # os.makedirs(screenshot_dir)
-        outname = os.path.join(screenshot_dir, "render")
-        print(f"Rendering {outname}.png")
-        image = testbed.render(
-                1920,
-                1080,
-                opt.screenshot_spp,
-                True,
-            )
-        if os.path.dirname(outname) != "":
-            os.makedirs(os.path.dirname(outname), exist_ok=True)
-        write_image(outname + ".png", image)
-    if opt.screenshot_transforms:
-        screenshot()
+    # if opt.screenshot:
+    #     screenshot_dir = opj(output_dir, "screenshot")
+    #     # os.makedirs(screenshot_dir)
+    #     outname = os.path.join(screenshot_dir, "render")
+    #     print(f"Rendering {outname}.png")
+    #     image = testbed.render(
+    #             1920,
+    #             1080,
+    #             opt.screenshot_spp,
+    #             True,
+    #         )
+    #     if os.path.dirname(outname) != "":
+    #         os.makedirs(os.path.dirname(outname), exist_ok=True)
+    #     write_image(outname + ".png", image)
+    # if opt.screenshot_transforms:
+    #     screenshot()
     # density_grid_dict = testbed.get_density_grid()
     # camera_pos_dir_dict = testbed.get_camera_pos_dir()
     # plot_density_grid(

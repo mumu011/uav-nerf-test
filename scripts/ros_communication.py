@@ -39,10 +39,10 @@ idx_scene = -1
 global idx_depth
 idx_depth = -1
 global interval
-interval = 5
+interval = 1
 # GPU
 global max_image
-max_image = 5
+max_image = 1
 # end
 global target_end_seq
 target_end_seq = 50
@@ -98,7 +98,7 @@ class Ros_Node:
         print(f'message recved: {message.data}')
 
     def pos_recv_cb(self, pos: PoseStamped):
-        print(f"pos stamp: {pos.header.stamp}")
+        # print(f"pos stamp: {pos.header.stamp}")
         # print(f"pos seq: {pos.header.seq}")
         # return
         global xform
@@ -199,7 +199,7 @@ class Ros_Node:
             flag_camera_info = False
 
     def image_scene_recv_cb(self, image: Image):
-        print(f"scene stamp:{image.header.stamp}")
+        # print(f"scene stamp:{image.header.stamp}")
         # print(f"scene seq:{image.header.seq}")
         # return
         global output_dir
@@ -219,9 +219,9 @@ class Ros_Node:
         seq = image.header.seq
         if (seq > target_end_seq):
             return
-        if (seq > target_seq_scene):
+        if (seq > target_seq_scene and interval != 1):
             target_seq_scene += interval
-        elif (seq == target_seq_scene):
+        elif (seq == target_seq_scene or interval == 1):
             img = CvBridge().imgmsg_to_cv2(image)
             image_dir = opj(
                 output_dir,
@@ -289,7 +289,7 @@ class Ros_Node:
                 # self.testbed.training_step = 0
 
     def image_depth_recv_cb(self, image: Image):
-        print(f"depth stamp:{image.header.stamp}")
+        # print(f"depth stamp:{image.header.stamp}")
         # print(f"depth seq:{image.header.seq}")
         # return
         global output_dir
@@ -309,9 +309,9 @@ class Ros_Node:
         seq = image.header.seq
         if (seq > target_end_seq):
             return
-        if (seq > target_seq_depth):
+        if (seq > target_seq_depth and interval != 1):
             target_seq_depth += interval
-        elif (seq == target_seq_depth):
+        elif (seq == target_seq_depth or interval == 1):
             img = CvBridge().imgmsg_to_cv2(image)
             image_dir = opj(
                 output_dir,

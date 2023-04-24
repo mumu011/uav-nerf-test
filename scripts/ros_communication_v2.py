@@ -24,13 +24,22 @@ output_dir = opj(
 global target_seq
 target_seq = 0
 global interval
-interval = 5
+interval = 1
 # GPU
 global max_image
 max_image = 3
 # end
 global target_end_seq
-target_end_seq = 200
+target_end_seq = 40
+# TODO: unified pose and image at the same time: depth main
+# TODO: unified scene and depth at the same time: seq
+global position
+position = PoseStamped()
+global position2
+position2 = PoseStamped()
+# test
+global pos_stamp
+pos_stamp = 0
 
 class NumpyArrayEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -48,23 +57,159 @@ class Ros_Node:
         # rospy.Subscriber(f"/image", Image, self.image_recv_cb)
         drone_id = 1
         # rospy.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera_vis/DepthVis/camera_info", CameraInfo, self.camera_info_recv_cb)
-        # rospy.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera/pose", PoseStamped, self.pos_recv_cb)
+        rospy.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera/pose", PoseStamped, self.pos_recv_cb, drone_id)
         # rospy.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_scene_camera/Scene", Image, self.image_scene_recv_cb)
         # rospy.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera_vis/DepthVis", Image, self.image_depth_recv_cb)
 
         info_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera_vis/DepthVis/camera_info", CameraInfo)
-        pos_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera/pose", PoseStamped)
+        # pos_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera/pose", PoseStamped)
         scene_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_scene_camera/Scene", Image)
         depth_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera_vis/DepthVis", Image)
 
-        ts = message_filters.ApproximateTimeSynchronizer([info_sub, pos_sub, scene_sub, depth_sub], 1000, 0.001)
-        ts_test = message_filters.ApproximateTimeSynchronizer([info_sub, scene_sub, depth_sub], 100, 0.1)
-        ts.registerCallback(self.recv_callback)
-        ts_test.registerCallback(self.recv_test_callback)
+        # ts = message_filters.ApproximateTimeSynchronizer([info_sub, pos_sub, scene_sub, depth_sub], 1000, 0.001)
+        ts = message_filters.ApproximateTimeSynchronizer([info_sub, scene_sub, depth_sub], 100, 1)
+        # ts.registerCallback(self.recv_callback)
+        ts.registerCallback(self.recv_test_callback, drone_id)
 
-    def recv_test_callback(self, camera_info: CameraInfo, scene: Image, depth: Image):
-        seq = scene.header.seq
-        print(f"seq test:{seq}")
+        # multiple
+        drone_id_two = 2
+        rospy.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_depth_camera/pose", PoseStamped, self.pos_recv_cb, drone_id_two)
+        info_sub_two = message_filters.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_depth_camera_vis/DepthVis/camera_info", CameraInfo)
+        scene_sub_two = message_filters.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_scene_camera/Scene", Image)
+        depth_sub_two = message_filters.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_depth_camera_vis/DepthVis", Image)
+
+        ts_two = message_filters.ApproximateTimeSynchronizer([info_sub_two, scene_sub_two, depth_sub_two], 100, 1)
+        ts_two.registerCallback(self.recv_test_callback, drone_id_two)
+
+    def pos_recv_cb(self, pos: PoseStamped, drone_id: int):
+        print(f"drone_id {drone_id} pos stamp: {pos.header.stamp.to_sec()}")
+        # print(f"pos seq: {pos.header.seq}")
+        # return
+        global position
+        global position2
+        global pos_stamp
+        if (drone_id == 1):
+            position = pos
+        elif (drone_id == 2):
+            position2 = pos
+        # pos_stamp = pos.header.stamp.to_sec()
+
+    
+
+    def recv_test_callback(self, camera_info: CameraInfo, scene: Image, depth: Image, drone_id: int):
+        global position
+        global position2
+        global pos_stamp
+        global target_seq_scene
+        global target_seq
+        global interval
+        # print(f"drone_id:{drone_id}")
+        seq_scene = scene.header.seq
+        seq_depth = depth.header.seq
+        # test
+        scene_stamp = scene.header.stamp.to_sec()
+        depth_stamp = depth.header.stamp.to_sec()
+        if (seq_scene != seq_depth):
+            return
+        print(f"drone_id {drone_id} seq_scene test:{seq_scene}")
+        print(f"drone_id {drone_id} seq_depth test:{seq_depth}")
+        if (seq_scene > target_end_seq):
+            return
+        if (seq_scene > target_seq and interval != 1):
+            target_seq += interval
+        elif (seq_scene == target_seq or interval == 1):
+            if(len(camera_info.D) == 0):
+                param_info = {
+                    'fl_x': camera_info.K[0],
+                    'fl_y': camera_info.K[4],
+                    'k1': 0.0,
+                    'k2': 0.0,
+                    'p1': 0.0,
+                    'p2': 0.0,
+                    'cx': camera_info.K[2],
+                    'cy': camera_info.K[5],
+                    'w': camera_info.width,
+                    'h': camera_info.height,
+                }
+            else:
+                param_info = {
+                    'fl_x': camera_info.K[0],
+                    'fl_y': camera_info.K[4],
+                    'k1': camera_info.D[0],
+                    'k2': camera_info.D[1],
+                    'p1': camera_info.D[2],
+                    'p2': camera_info.D[3],
+                    'cx': camera_info.K[2],
+                    'cy': camera_info.K[5],
+                    'w': camera_info.width,
+                    'h': camera_info.height,
+                }
+
+            img_scene = CvBridge().imgmsg_to_cv2(scene)
+            image_dir = opj(
+                output_dir,
+                "image"
+            )
+            if not os.path.exists(image_dir):
+                os.makedirs(image_dir)
+            filename = opj(
+                image_dir,
+                f"{drone_id}_{seq_scene}.png"
+            )
+            cv2.imwrite(filename, img_scene)
+
+            img_depth = CvBridge().imgmsg_to_cv2(depth)
+            image_dir = opj(
+                output_dir,
+                "depth"
+            )
+            if not os.path.exists(image_dir):
+                os.makedirs(image_dir)
+            filename = opj(
+                image_dir,
+                f"{drone_id}_{seq_depth}.png"
+            )
+            cv2.imwrite(filename, img_depth)   
+
+            file_name = opj(
+                output_dir,
+                "test.json"
+            )
+            with open(file_name, "r") as f:
+                content = json.load(f)
+            content.update(param_info)
+            if (drone_id == 1):
+                quaternion = position.pose.orientation
+                position_meter = position.pose.position
+            elif (drone_id == 2):
+                quaternion = position2.pose.orientation
+                position_meter = position2.pose.position
+            param_img = {
+                'file_path': f"image/{drone_id}_{seq_scene}.png",
+                'depth_path': f"depth/{drone_id}_{seq_depth}.png",
+                'quaternion': {
+                    'w': quaternion.w,
+                    'x': quaternion.x,
+                    'y': quaternion.y,
+                    'z': quaternion.z,
+                },
+                'position': {
+                    'x': position_meter.x,
+                    'y': position_meter.y,
+                    'z': position_meter.z,
+                },
+                # 'scene_stamp': scene_stamp,
+                # 'depth_stamp': depth_stamp,
+                # 'pos_stamp': pos_stamp
+            }
+            content["frames"].append(param_img)
+            data_json = json.dumps(content, indent=2)
+            with open(file_name, "w", newline='\n') as f:
+                f.write(data_json)
+
+            # self.testbed.reload_training_data() 
+            # self.testbed.training_step = 0
+        
 
     def recv_callback(self, camera_info: CameraInfo, pos: PoseStamped, scene: Image, depth: Image):
         seq = scene.header.seq
