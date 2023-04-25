@@ -427,7 +427,7 @@ PYBIND11_MODULE(pyngp, m) {
 			py::arg("shutter_fraction") = 1.0f
 		)
 		.def("train", &Testbed::train, py::call_guard<py::gil_scoped_release>(), "Perform a single training step with a specified batch size.")
-		.def("reset", &Testbed::reset_network, py::arg("reset_density_grid") = true, "Reset training.")
+		.def("reset_network", &Testbed::reset_network, py::arg("reset_density_grid") = true, "Reset training.")
 		.def("reset_accumulation", &Testbed::reset_accumulation, "Reset rendering accumulation.",
 			py::arg("due_to_camera_movement") = false,
 			py::arg("immediate_redraw") = true
@@ -438,6 +438,7 @@ PYBIND11_MODULE(pyngp, m) {
 			py::arg("config_base_path") = ""
 		)
 		.def("reload_training_data", &Testbed::reload_training_data, "reload_training_data")
+		.def("reset", &Testbed::reset, py::arg("include_optimizer_state")=false, "reset")
 		.def("override_sdf_training_data", &Testbed::override_sdf_training_data, "Override the training data for learning a signed distance function")
 		.def("calculate_iou", &Testbed::calculate_iou, "Calculate the intersection over union error value",
 			py::arg("n_samples") = 128*1024*1024,

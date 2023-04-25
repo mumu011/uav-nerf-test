@@ -75,6 +75,8 @@ public:
 	void load_training_data(const fs::path& path);
 	void reload_training_data();
 	void clear_training_data();
+	// new function
+	void reset(bool include_optimizer_state);
 
 	void set_mode(ETestbedMode mode);
 

@@ -201,6 +201,8 @@ instant-ngp$ cmake --build build --config RelWithDebInfo -j
 cd ~/uav-nerf-test/ && python scripts/main.py
 cd ~/uav-nerf-test/ && python scripts/ros_main.py
 cd ~/uav-nerf-sim/launch && roslaunch start_simulation.launch 
+cmake -DCMAKE_BUILD_TYPE=Debug . -B build
+cmake --build build -j
 ```
 
 If compilation fails inexplicably or takes longer than an hour, you might be running out of memory. Try running the above command without `-j` in that case.

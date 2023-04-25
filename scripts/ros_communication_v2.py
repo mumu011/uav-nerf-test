@@ -14,6 +14,7 @@ from os.path import dirname as opd
 import message_filters
 
 import pyngp as ngp
+from transform import transform
 
 global output_dir
 output_dir = opj(
@@ -27,10 +28,12 @@ global interval
 interval = 1
 # GPU
 global max_image
-max_image = 3
+max_image = 50
+global json_idx
+json_idx = 0
 # end
 global target_end_seq
-target_end_seq = 40
+target_end_seq = 100
 # TODO: unified pose and image at the same time: depth main
 # TODO: unified scene and depth at the same time: seq
 global position
@@ -50,7 +53,7 @@ class NumpyArrayEncoder(json.JSONEncoder):
 class Ros_Node:
     def __init__(self, testbed: ngp.Testbed) -> None:
         self.testbed = testbed
-        self.clear_json()
+        self.clear_json(json_idx)
         # rospy.Subscriber(f"/msg", String, self.msg_recv_cb)
         # rospy.Subscriber(f"/pos", PoseStamped, self.pos_recv_cb)
         # rospy.Subscriber(f"/camera_info", CameraInfo, self.camera_info_recv_cb)
@@ -92,9 +95,7 @@ class Ros_Node:
             position = pos
         elif (drone_id == 2):
             position2 = pos
-        # pos_stamp = pos.header.stamp.to_sec()
-
-    
+        # pos_stamp = pos.header.stamp.to_sec()    
 
     def recv_test_callback(self, camera_info: CameraInfo, scene: Image, depth: Image, drone_id: int):
         global position
@@ -103,6 +104,8 @@ class Ros_Node:
         global target_seq_scene
         global target_seq
         global interval
+        global max_image
+        global json_idx
         # print(f"drone_id:{drone_id}")
         seq_scene = scene.header.seq
         seq_depth = depth.header.seq
@@ -113,8 +116,8 @@ class Ros_Node:
             return
         print(f"drone_id {drone_id} seq_scene test:{seq_scene}")
         print(f"drone_id {drone_id} seq_depth test:{seq_depth}")
-        if (seq_scene > target_end_seq):
-            return
+        # if (seq_scene > target_end_seq):
+        #     return
         if (seq_scene > target_seq and interval != 1):
             target_seq += interval
         elif (seq_scene == target_seq or interval == 1):
@@ -173,7 +176,7 @@ class Ros_Node:
 
             file_name = opj(
                 output_dir,
-                "test.json"
+                f"test_{json_idx}.json"
             )
             with open(file_name, "r") as f:
                 content = json.load(f)
@@ -203,12 +206,14 @@ class Ros_Node:
                 # 'pos_stamp': pos_stamp
             }
             content["frames"].append(param_img)
+            img_num = len(content["frames"])
             data_json = json.dumps(content, indent=2)
             with open(file_name, "w", newline='\n') as f:
                 f.write(data_json)
 
-            # self.testbed.reload_training_data() 
-            # self.testbed.training_step = 0
+            if (img_num % max_image == 0):
+                json_idx += 1
+                self.clear_json(json_idx)
         
 
     def recv_callback(self, camera_info: CameraInfo, pos: PoseStamped, scene: Image, depth: Image):
@@ -314,7 +319,7 @@ class Ros_Node:
             # self.testbed.reload_training_data() 
             # self.testbed.training_step = 0
 
-    def clear_json(self):
+    def clear_json(self, json_idx: int):
         param = {
             'camera_angle_x': 0.0,
             'camera_angle_y': 0.0,
@@ -332,7 +337,7 @@ class Ros_Node:
             os.makedirs(output_dir)
         file_name = opj(
             output_dir,
-            "test.json"
+            f"test_{json_idx}.json"
         )
         with open(file_name, "w", newline='\n') as f:
             f.write(data_json)

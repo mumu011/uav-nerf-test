@@ -33,7 +33,8 @@ sys.path.append(pyngp_path)
 import pyngp as ngp
 # from vis import plot_density_grid
 
-from ros_communication_v2 import listener        
+from ros_communication_v2 import listener 
+from transform import transform       
 
 def test():
     print("Evaluating test transforms from ", opt.test_transforms)
@@ -233,10 +234,10 @@ if __name__ == "__main__":
     testbed.nerf.training.empty_density_loss_scale = opt.empty_density_loss_scale
     testbed.nerf.training.opaque_density_loss_scale = opt.opaque_density_loss_scale
 
-    listener(testbed)
-
-    sys.exit(0)
-    testbed.load_training_data(opt.training_data)
+    # listener(testbed)
+        
+    # sys.exit(0)
+    # testbed.load_training_data(opt.training_data)
     # sys.exit(0)
     if opt.load_snapshot:
         snapshot = opt.load_snapshot
@@ -249,8 +250,8 @@ if __name__ == "__main__":
         testbed.reload_network_from_file(network_config_path)
 
     # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
-    while (testbed.nerf.training.n_images_for_training == 0):
-        continue
+    # while (testbed.nerf.training.n_images_for_training == 0):
+    #     continue
 
     testbed.shall_train = True
     testbed.nerf.render_with_camera_distortion = True
@@ -297,30 +298,74 @@ if __name__ == "__main__":
     #                 old_training_step = testbed.training_step
     #                 tqdm_last_update = now
 
-    while True:
-        try:
-            testbed.frame()
-        except Exception as e:
-            testbed.reset()
-        print(f"training_step:{testbed.training_step}, loss:{testbed.loss}")
-        if (np.isnan(testbed.loss) or testbed.loss == 0.0):
-            testbed.reset()
-        if (testbed.training_step > 0 and testbed.training_step % 500 == 0):
-            render(testbed.training_step)
+    # while True:
+    #     try:
+    #         testbed.frame()
+    #     except Exception as e:
+    #         testbed.reset()
+    #     print(f"training_step:{testbed.training_step}, loss:{testbed.loss}")
+    #     if (np.isnan(testbed.loss) or testbed.loss == 0.0):
+    #         testbed.reset()
+    #     if (testbed.training_step > 0 and testbed.training_step % 500 == 0):
+    #         render(testbed.training_step)
 
-    if opt.save_snapshot:
-        print("Saving snapshot ", opt.save_snapshot)
-        testbed.save_snapshot(opt.save_snapshot, False)
+    if n_steps > 0:
+        for json_idx in range(0, 21):
+            transform(json_idx)
+            if (json_idx == 0):
+                testbed.load_training_data(opt.training_data)
+            else:
+                testbed.reset(True)
+            with tqdm(desc="Training", total=n_steps, unit="step") as t:
+                while True:
+                    if (
+                        testbed.training_step >= n_steps
+                        or train_seconds_last >= train_seconds
+                    ):
+                        with open(log_path, "a") as f:
+                            f.write(
+                                "train steps:{}\ntrain seconds:{}\n".format(
+                                    testbed.training_step, train_seconds_last
+                                )
+                            )
+                            f.write(
+                                "seconds per train step:{}\n".format(
+                                    train_seconds_last / testbed.training_step
+                                )
+                            )
+                        break
+                    tic = time.time()
+                    testbed.frame()
+                    # print(f"training_step:{testbed.training_step}")
+                    # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
+                    toc = time.time()
+                    train_seconds_last += toc - tic
+                    # Update progress bar
+                    if testbed.training_step < old_training_step or old_training_step == 0:
+                        old_training_step = 0
+                        t.reset()
+                    now = time.monotonic()
+                    if now - tqdm_last_update > 0.1:
+                        t.update(testbed.training_step - old_training_step)
+                        t.set_postfix(loss=testbed.loss)
+                        old_training_step = testbed.training_step
+                        tqdm_last_update = now
+            render(json_idx)
+                
 
-    if opt.test_transforms:
-        test()
+    # if opt.save_snapshot:
+    #     print("Saving snapshot ", opt.save_snapshot)
+    #     testbed.save_snapshot(opt.save_snapshot, False)
 
-    if opt.save_mesh:
-        res = opt.marching_cubes_res or 256
-        print(
-            f"Generating mesh via marching cubes and saving to {opt.save_mesh}. Resolution=[{res},{res},{res}]"
-        )
-        testbed.compute_and_save_marching_cubes_mesh(opt.save_mesh, [res, res, res])
+    # if opt.test_transforms:
+    #     test()
+
+    # if opt.save_mesh:
+    #     res = opt.marching_cubes_res or 256
+    #     print(
+    #         f"Generating mesh via marching cubes and saving to {opt.save_mesh}. Resolution=[{res},{res},{res}]"
+    #     )
+    #     testbed.compute_and_save_marching_cubes_mesh(opt.save_mesh, [res, res, res])
 
     # if opt.screenshot:
     #     screenshot_dir = opj(output_dir, "screenshot")

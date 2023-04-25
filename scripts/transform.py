@@ -60,12 +60,19 @@ def create_translation_matrix(offset):
     T[:3, 3] = offset
     return T
 
-def transform():
+def transform(json_idx: int):
     global output_dir
-    file_name = opj(
-        output_dir,
-        "test.json"
-    )
+    # test
+    if (json_idx == -1):
+        file_name = opj(
+            output_dir,
+            "test.json"
+        )
+    else:
+        file_name = opj(
+            output_dir,
+            f"test_{json_idx}.json"
+        )
     with open(file_name, "r") as f:
         content = json.load(f)
 
@@ -101,11 +108,19 @@ def transform():
 
     # ORIGIN = [x_min, y_min, z_min]
     ORIGIN = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
-    scale = 40
-    x_list = (x_list - ORIGIN[0]) / scale
-    y_list = (y_list - ORIGIN[1]) / scale
-    z_list = (z_list - ORIGIN[2]) / scale
+    X_LEN = x_max - x_min
+    Y_LEN = y_max - y_min
+    Z_LEN = z_max - z_min
+    # scale = 10
+    # x_list = (x_list - ORIGIN[0]) / scale
+    # y_list = (y_list - ORIGIN[1]) / scale
+    # z_list = (z_list - ORIGIN[2]) / scale
+    x_list = (x_list - ORIGIN[0]) / X_LEN / 2
+    y_list = (y_list - ORIGIN[1]) / Y_LEN / 2
+    z_list = (z_list - ORIGIN[2]) / Z_LEN / 2
 
+    re = []
+    idx = []
     for i in range(imgs_num):
         qvec = np.array([q_w[i], q_x[i], q_y[i], q_z[i]])
         R = qvec2rotmat(qvec)
@@ -119,9 +134,17 @@ def transform():
 
         xform = T_ @ R_
 
+        if xform.tolist() in re:
+            idx.append(i)
+    
         content["frames"][i].pop("position")
         content["frames"][i].pop("quaternion")
         content["frames"][i].update({'transform_matrix': xform})
+        re.append(xform.tolist())
+    
+    for counter, index in enumerate(idx):
+        index = index - counter
+        content["frames"].pop(index)
 
     file_name = opj(
         output_dir,
@@ -134,5 +157,5 @@ def transform():
         print("done")
 
 if __name__ == "__main__":
-    transform()
-    read()
+    transform(0)
+    # read()

@@ -144,7 +144,8 @@ def screenshot():
     # testbed.fov_axis = 0
     # testbed.fov = ref_transforms["camera_angle_x"] * 180 / np.pi
     # render_seconds_last = 0
-    for render_mode in [ngp.RenderMode.Shade,ngp.RenderMode.Positions,ngp.RenderMode.Depth]:
+    # for render_mode in [ngp.RenderMode.Shade,ngp.RenderMode.Positions,ngp.RenderMode.Depth]:
+    for render_mode in [ngp.RenderMode.Shade]:
         testbed.render_mode=render_mode
         for idx in range(len(ref_transforms["frames"])):
             f = ref_transforms["frames"][int(idx)]
@@ -300,8 +301,8 @@ if __name__ == "__main__":
         outname = os.path.join(screenshot_dir, "render")
         print(f"Rendering {outname}.png")
         image = testbed.render(
-                1920,
-                1080,
+                opt.width or 1920,
+                opt.height or 1080,
                 opt.screenshot_spp,
                 True,
             )

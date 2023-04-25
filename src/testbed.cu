@@ -4844,6 +4844,27 @@ void Testbed::load_snapshot(const fs::path& path) {
 	set_all_devices_dirty();
 }
 
+void Testbed::reset(bool include_optimizer_state){
+	load_nerf(m_data_path);
+	load_nerf_post();
+
+	if (m_nerf.density_grid.size() == NERF_GRID_N_CELLS() * (m_nerf.max_cascade + 1)) {
+		update_density_grid_mean_and_bitfield(nullptr);
+	} else if (m_nerf.density_grid.size() != 0) {
+		// A size of 0 indicates that the density grid was never populated, which is a valid state of a (yet) untrained model.
+		throw std::runtime_error{"Incompatible number of grid cascades."};
+	}
+
+	// reset_network(false);
+
+	// 0 or 1?
+	m_training_step = 0;
+
+	// m_trainer->deserialize(m_trainer->serialize(include_optimizer_state));
+
+	set_all_devices_dirty();
+}
+
 void Testbed::CudaDevice::set_nerf_network(const std::shared_ptr<NerfNetwork<precision_t>>& nerf_network) {
 	m_network = m_nerf_network = nerf_network;
 }
