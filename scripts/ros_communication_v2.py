@@ -12,14 +12,18 @@ import os
 from os.path import join as opj
 from os.path import dirname as opd
 import message_filters
+import datetime
 
 import pyngp as ngp
+from common import *
 from transform import transform
+
+event = threading.Event()
 
 global output_dir
 output_dir = opj(
     opd(opd(__file__)),
-    "output_v2"
+    "output_v3"
 )
 # test
 global target_seq
@@ -43,6 +47,10 @@ position2 = PoseStamped()
 # test
 global pos_stamp
 pos_stamp = 0
+global screenshot_dir
+screenshot_dir = opj(output_dir, 
+    "screenshot", 
+    datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S"))
 
 class NumpyArrayEncoder(json.JSONEncoder):
     def default(self, obj):
@@ -53,6 +61,7 @@ class NumpyArrayEncoder(json.JSONEncoder):
 class Ros_Node:
     def __init__(self, testbed: ngp.Testbed) -> None:
         self.testbed = testbed
+        self.clear_transforms()
         self.clear_json(json_idx)
         # rospy.Subscriber(f"/msg", String, self.msg_recv_cb)
         # rospy.Subscriber(f"/pos", PoseStamped, self.pos_recv_cb)
@@ -70,7 +79,7 @@ class Ros_Node:
         depth_sub = message_filters.Subscriber(f"/airsim_node/uav{drone_id}/uav{drone_id}_depth_camera_vis/DepthVis", Image)
 
         # ts = message_filters.ApproximateTimeSynchronizer([info_sub, pos_sub, scene_sub, depth_sub], 1000, 0.001)
-        ts = message_filters.ApproximateTimeSynchronizer([info_sub, scene_sub, depth_sub], 100, 1)
+        ts = message_filters.ApproximateTimeSynchronizer([info_sub, scene_sub, depth_sub], 1000, 1)
         # ts.registerCallback(self.recv_callback)
         ts.registerCallback(self.recv_test_callback, drone_id)
 
@@ -81,11 +90,11 @@ class Ros_Node:
         scene_sub_two = message_filters.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_scene_camera/Scene", Image)
         depth_sub_two = message_filters.Subscriber(f"/airsim_node/uav{drone_id_two}/uav{drone_id_two}_depth_camera_vis/DepthVis", Image)
 
-        ts_two = message_filters.ApproximateTimeSynchronizer([info_sub_two, scene_sub_two, depth_sub_two], 100, 1)
+        ts_two = message_filters.ApproximateTimeSynchronizer([info_sub_two, scene_sub_two, depth_sub_two], 1000, 1)
         ts_two.registerCallback(self.recv_test_callback, drone_id_two)
 
     def pos_recv_cb(self, pos: PoseStamped, drone_id: int):
-        print(f"drone_id {drone_id} pos stamp: {pos.header.stamp.to_sec()}")
+        # print(f"drone_id {drone_id} pos stamp: {pos.header.stamp.to_sec()}")
         # print(f"pos seq: {pos.header.seq}")
         # return
         global position
@@ -114,8 +123,8 @@ class Ros_Node:
         depth_stamp = depth.header.stamp.to_sec()
         if (seq_scene != seq_depth):
             return
-        print(f"drone_id {drone_id} seq_scene test:{seq_scene}")
-        print(f"drone_id {drone_id} seq_depth test:{seq_depth}")
+        # print(f"drone_id {drone_id} seq_scene test:{seq_scene}")
+        # print(f"drone_id {drone_id} seq_depth test:{seq_depth}")
         # if (seq_scene > target_end_seq):
         #     return
         if (seq_scene > target_seq and interval != 1):
@@ -214,6 +223,33 @@ class Ros_Node:
             if (img_num % max_image == 0):
                 json_idx += 1
                 self.clear_json(json_idx)
+                transform(json_idx-1)
+                # first loop
+                file_name = opj(
+                    output_dir,
+                    f"transforms.json"
+                )
+                if (json_idx == 1):
+                    self.testbed.load_training_data(file_name)
+                    event.set()
+                else:
+                    event.clear()
+                    # render
+                    if not os.path.exists(screenshot_dir):
+                        os.makedirs(screenshot_dir)
+                    outname = os.path.join(screenshot_dir, f"render_{json_idx-1}")
+                    print(f"Rendering {outname}.png")
+                    image = self.testbed.render(
+                            1920,
+                            1080,
+                            1,
+                            True,
+                        )
+                    if os.path.dirname(outname) != "":
+                        os.makedirs(os.path.dirname(outname), exist_ok=True)
+                    write_image(outname + ".png", image)
+                    self.testbed.reset(True)
+                    event.set()
         
 
     def recv_callback(self, camera_info: CameraInfo, pos: PoseStamped, scene: Image, depth: Image):
@@ -342,6 +378,29 @@ class Ros_Node:
         with open(file_name, "w", newline='\n') as f:
             f.write(data_json)
 
+    def clear_transforms(self):
+        param = {
+            'camera_angle_x': 0.0,
+            'camera_angle_y': 0.0,
+            'aabb_scale': 1,
+            'scale': 0.8,
+            'enable_depth_loading': True,
+            'depth_range_realunit': 100,
+            'real2ngp_uint_conersion': 0.025,
+            'depth_bit_depth': 8,
+            'n_extra_learnable_dims': 0,
+            'frames': []
+        }
+        data_json = json.dumps(param, cls=NumpyArrayEncoder, indent=2)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        file_name = opj(
+            output_dir,
+            f"transforms.json"
+        )
+        with open(file_name, "w", newline='\n') as f:
+            f.write(data_json)
+
     def msg_recv_cb(self, message: String):
         print(f'message recved: {message.data}')
         
@@ -357,3 +416,4 @@ def listener(testbed: ngp.Testbed):
 
     spin_thread = threading.Thread(target = thread_job)
     spin_thread.start()
+    # spin_thread.join()

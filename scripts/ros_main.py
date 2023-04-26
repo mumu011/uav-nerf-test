@@ -33,8 +33,8 @@ sys.path.append(pyngp_path)
 import pyngp as ngp
 # from vis import plot_density_grid
 
-from ros_communication_v2 import listener 
-from transform import transform       
+from ros_communication_v2 import listener, event
+from transform import transform   
 
 def test():
     print("Evaluating test transforms from ", opt.test_transforms)
@@ -234,7 +234,7 @@ if __name__ == "__main__":
     testbed.nerf.training.empty_density_loss_scale = opt.empty_density_loss_scale
     testbed.nerf.training.opaque_density_loss_scale = opt.opaque_density_loss_scale
 
-    # listener(testbed)
+    listener(testbed)
         
     # sys.exit(0)
     # testbed.load_training_data(opt.training_data)
@@ -298,59 +298,60 @@ if __name__ == "__main__":
     #                 old_training_step = testbed.training_step
     #                 tqdm_last_update = now
 
-    # while True:
-    #     try:
-    #         testbed.frame()
-    #     except Exception as e:
-    #         testbed.reset()
-    #     print(f"training_step:{testbed.training_step}, loss:{testbed.loss}")
-    #     if (np.isnan(testbed.loss) or testbed.loss == 0.0):
-    #         testbed.reset()
-    #     if (testbed.training_step > 0 and testbed.training_step % 500 == 0):
-    #         render(testbed.training_step)
+    while True:
+        try:
+            event.wait()
+            testbed.frame()
+        except Exception as e:
+            testbed.reset_network()
+        print(f"training_step:{testbed.training_step}, loss:{testbed.loss}")
+        if (np.isnan(testbed.loss) or testbed.loss == 0.0):
+            testbed.reset_network()
+        # if (testbed.training_step > 0 and testbed.training_step % 500 == 0):
+        #     render(testbed.training_step)
 
-    if n_steps > 0:
-        for json_idx in range(0, 21):
-            transform(json_idx)
-            if (json_idx == 0):
-                testbed.load_training_data(opt.training_data)
-            else:
-                testbed.reset(True)
-            with tqdm(desc="Training", total=n_steps, unit="step") as t:
-                while True:
-                    if (
-                        testbed.training_step >= n_steps
-                        or train_seconds_last >= train_seconds
-                    ):
-                        with open(log_path, "a") as f:
-                            f.write(
-                                "train steps:{}\ntrain seconds:{}\n".format(
-                                    testbed.training_step, train_seconds_last
-                                )
-                            )
-                            f.write(
-                                "seconds per train step:{}\n".format(
-                                    train_seconds_last / testbed.training_step
-                                )
-                            )
-                        break
-                    tic = time.time()
-                    testbed.frame()
-                    # print(f"training_step:{testbed.training_step}")
-                    # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
-                    toc = time.time()
-                    train_seconds_last += toc - tic
-                    # Update progress bar
-                    if testbed.training_step < old_training_step or old_training_step == 0:
-                        old_training_step = 0
-                        t.reset()
-                    now = time.monotonic()
-                    if now - tqdm_last_update > 0.1:
-                        t.update(testbed.training_step - old_training_step)
-                        t.set_postfix(loss=testbed.loss)
-                        old_training_step = testbed.training_step
-                        tqdm_last_update = now
-            render(json_idx)
+    # if n_steps > 0:
+    #     for json_idx in range(0, 21):
+    #         transform(json_idx)
+    #         if (json_idx == 0):
+    #             testbed.load_training_data(opt.training_data)
+    #         else:
+    #             testbed.reset(True)
+    #         with tqdm(desc="Training", total=n_steps, unit="step") as t:
+    #             while True:
+    #                 if (
+    #                     testbed.training_step >= n_steps
+    #                     or train_seconds_last >= train_seconds
+    #                 ):
+    #                     with open(log_path, "a") as f:
+    #                         f.write(
+    #                             "train steps:{}\ntrain seconds:{}\n".format(
+    #                                 testbed.training_step, train_seconds_last
+    #                             )
+    #                         )
+    #                         f.write(
+    #                             "seconds per train step:{}\n".format(
+    #                                 train_seconds_last / testbed.training_step
+    #                             )
+    #                         )
+    #                     break
+    #                 tic = time.time()
+    #                 testbed.frame()
+    #                 # print(f"training_step:{testbed.training_step}")
+    #                 # print(f"images_for_training:{testbed.nerf.training.n_images_for_training}")
+    #                 toc = time.time()
+    #                 train_seconds_last += toc - tic
+    #                 # Update progress bar
+    #                 if testbed.training_step < old_training_step or old_training_step == 0:
+    #                     old_training_step = 0
+    #                     t.reset()
+    #                 now = time.monotonic()
+    #                 if now - tqdm_last_update > 0.1:
+    #                     t.update(testbed.training_step - old_training_step)
+    #                     t.set_postfix(loss=testbed.loss)
+    #                     old_training_step = testbed.training_step
+    #                     tqdm_last_update = now
+    #         render(json_idx)
                 
 
     # if opt.save_snapshot:

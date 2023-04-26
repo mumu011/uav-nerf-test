@@ -7,7 +7,7 @@ from os.path import dirname as opd
 global output_dir
 output_dir = opj(
     opd(opd(__file__)),
-    "output_v2"
+    "output_v3"
 )
 
 class NumpyArrayEncoder(json.JSONEncoder):
@@ -107,17 +107,18 @@ def transform(json_idx: int):
     z_max = np.max(z_list)
 
     # ORIGIN = [x_min, y_min, z_min]
-    ORIGIN = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
-    X_LEN = x_max - x_min
-    Y_LEN = y_max - y_min
-    Z_LEN = z_max - z_min
-    # scale = 10
-    # x_list = (x_list - ORIGIN[0]) / scale
-    # y_list = (y_list - ORIGIN[1]) / scale
-    # z_list = (z_list - ORIGIN[2]) / scale
-    x_list = (x_list - ORIGIN[0]) / X_LEN / 2
-    y_list = (y_list - ORIGIN[1]) / Y_LEN / 2
-    z_list = (z_list - ORIGIN[2]) / Z_LEN / 2
+    # ORIGIN = [(x_min + x_max) / 2, (y_min + y_max) / 2, (z_min + z_max) / 2]
+    ORIGIN = [5, 5, 2]
+    # X_LEN = x_max - x_min
+    # Y_LEN = y_max - y_min
+    # Z_LEN = z_max - z_min
+    scale = 40
+    x_list = (x_list - ORIGIN[0]) / scale
+    y_list = (y_list - ORIGIN[1]) / scale
+    z_list = (z_list - ORIGIN[2]) / scale
+    # x_list = (x_list - ORIGIN[0]) / X_LEN / 2
+    # y_list = (y_list - ORIGIN[1]) / Y_LEN / 2
+    # z_list = (z_list - ORIGIN[2]) / Z_LEN / 2
 
     re = []
     idx = []
@@ -157,5 +158,5 @@ def transform(json_idx: int):
         print("done")
 
 if __name__ == "__main__":
-    transform(0)
+    transform(-1)
     # read()
